@@ -4,6 +4,8 @@
 <div class="flex justify-center items-center min-h-screen">
     <div class="bg-white shadow-md rounded-lg p-6 text-center w-[90%] max-w-lg">
         <!-- Nomor Sertifikat -->
+        <p class="text-sm font-medium text-gray-500 tracking-widest mb-4">Nomor Sertifikat: {{ str_replace('-', '/', $certificate->certificate_number) }}</p>
+
         <div class="flex justify-center items-center gap-2 mb-4">
             <img src="{{ asset('images/logo_dinus_new.png') }}" alt="Logo Dinus" class="w-24 h-24">
             <h1 class="text-3xl font-medium text-dark font-serif text-left">Program Studi Teknik Informatika</h1>

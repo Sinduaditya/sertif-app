@@ -21,7 +21,6 @@ class CertificateController extends Controller
         return view('certificates.create');
     }
 
-    // Store: Proses simpan sertifikat ke database
     public function store(Request $request)
 {
     $request->validate([
@@ -31,37 +30,57 @@ class CertificateController extends Controller
         'position' => 'required|string|max:255',
     ]);
 
-    // Handle Photo Profile Upload
-    if ($request->hasFile('photo_profile')) {
-        $photoProfile = $request->file('photo_profile');
-        $photoProfilePath = $photoProfile->store('photo_profiles', 'public'); // Simpan di folder storage/app/public/photo_profiles
+    try {
+        // Handle Photo Profile Upload
+        if ($request->hasFile('photo_profile')) {
+            $photoProfile = $request->file('photo_profile');
+            $photoProfilePath = $photoProfile->store('photo_profiles', 'public');
+        }
+
+        // Temporarily create certificate to get the `id` for incremental number
+        $temporaryCertificate = Certificate::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'position' => $request->position,
+            'certificate_number' => '', // Placeholder, will be updated below
+            'photo_profile' => 'storage/' . $photoProfilePath,
+            'qr_code_path' => '', // Placeholder, will be updated below
+        ]);
+
+        // Get participant number from `id`
+        $participantNumber = str_pad($temporaryCertificate->id, 3, '0', STR_PAD_LEFT);
+
+        // Generate Certificate Number
+        $certificateNumber = '002-HMTI-SEMNASTI-XI-2024-' . $participantNumber;
+
+        // Generate QR Code Data (URL to Certificate Detail)
+        $qrCodeData = route('certificates.show', $certificateNumber);
+
+        // Path to Save QR Code
+        $qrCodeDirectory = public_path('storage/qrcodes');
+        if (!file_exists($qrCodeDirectory)) {
+            mkdir($qrCodeDirectory, 0777, true); // Ensure the directory exists
+        }
+
+        // Define QR Code Path
+        $qrCodePath = 'qrcodes/' . $certificateNumber . '.png';
+
+        // Generate and Save QR Code
+        QrCode::format('png')->size(300)->generate($qrCodeData, public_path('storage/' . $qrCodePath));
+
+        // Update the certificate with correct certificate number and QR code path
+        $temporaryCertificate->update([
+            'certificate_number' => $certificateNumber,
+            'qr_code_path' => 'storage/' . $qrCodePath,
+        ]);
+
+        return redirect()->route('certificates.index')->with('success', 'Certificate created successfully!');
+    } catch (\Exception $e) {
+        // Handle exceptions and rollback changes
+        return redirect()->back()->withErrors(['error' => 'Failed to create certificate: ' . $e->getMessage()]);
     }
-
-    // Generate Certificate Number
-    $certificateNumber = 'CERT-' . strtoupper(uniqid());
-
-    // Generate QR Code Data (URL to Certificate Detail)
-    $qrCodeData = route('certificates.show', $certificateNumber);
-
-    // Path to Save QR Code
-    $qrCodePath = 'qrcodes/' . $certificateNumber . '.png';
-
-    // Generate QR Code and Save
-    QrCode::format('png')->size(300)->generate($qrCodeData, public_path('storage/' . $qrCodePath));
-
-    // Save Certificate to Database
-    Certificate::create([
-        'name' => $request->name,
-        'email' => $request->email,
-        'position' => $request->position,
-        'certificate_number' => $certificateNumber,
-        'qr_code_path' => 'storage/' . $qrCodePath,
-        'photo_profile' => 'storage/' . $photoProfilePath,
-    ]);
-
-    return redirect()->route('certificates.index')->with('success', 'Certificate created successfully!');
 }
-
+    
 
     // Show: Menampilkan detail sertifikat
     public function show($certificateNumber)
